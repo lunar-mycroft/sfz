@@ -51,6 +51,14 @@ pub enum PathType {
     SymlinkFile,
 }
 
+async fn shutdown_signal() {
+    // Wait for the CTRL+C signal
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to install CTRL+C signal handler");
+    println!("Exiting at users request")
+}
+
 /// Run the server.
 pub async fn serve(args: Args) -> BoxResult<()> {
     let address = args.address()?;
@@ -68,8 +76,9 @@ pub async fn serve(args: Args) -> BoxResult<()> {
 
     let server = hyper::Server::try_bind(&address)?.serve(make_svc);
     let address = server.local_addr();
+    let graceful = server.with_graceful_shutdown(shutdown_signal());
     println!("Files served on http://{}{}", address, path_prefix);
-    server.await?;
+    graceful.await?;
 
     Ok(())
 }
